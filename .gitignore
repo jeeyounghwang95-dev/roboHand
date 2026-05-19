@@ -1,0 +1,55 @@
+# Unity 자동 생성 폴더 (재생성 가능)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# 자동 생성 .meta 폴더
+/[Aa]ssets/AssetStoreTools*
+/[Aa]ssets/Plugins/Editor/JetBrains*
+
+# 빌드 결과물
+*.apk
+*.aab
+*.ipa
+*.unitypackage
+*.app
+*.exe
+*.x86_64
+
+# IDE / 솔루션 파일
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# OS 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Crashlytics / 라이브러리 캐시
+crashlytics-build.properties
+sysinfo.txt
