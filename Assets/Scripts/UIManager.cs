@@ -294,7 +294,7 @@ public class UIManager : MonoBehaviour
         lrt.anchorMin = new Vector2(0, 0.62f); lrt.anchorMax = new Vector2(1, 1f);
         lrt.sizeDelta = Vector2.zero; lrt.anchoredPosition = Vector2.zero;
 
-        var num = Txt(box.transform, "20", 48, new Color(1f, 0.82f, 0.3f), bold: true, center: true);
+        var num = Txt(box.transform, "30", 48, new Color(1f, 0.82f, 0.3f), bold: true, center: true);
         hudTimerText = num.GetComponent<TextMeshProUGUI>();
         var nrt = num.GetComponent<RectTransform>();
         nrt.anchorMin = new Vector2(0, 0f); nrt.anchorMax = new Vector2(1, 0.65f);
@@ -306,22 +306,24 @@ public class UIManager : MonoBehaviour
         hudPanel = Panel(canvasRoot, Color.clear, true, "HUD");
 
         // ── 상단 바 ──────────────────────────────────────────────────────────
-        var top = Panel(hudPanel.transform, new Color(0, 0, 0, 0.58f), false, "TopBar");
+        var top = Panel(hudPanel.transform, new Color(0, 0, 0, 0.70f), false, "TopBar");
         var tRt = top.GetComponent<RectTransform>();
         tRt.anchorMin = new Vector2(0, 1); tRt.anchorMax = Vector2.one;
         tRt.pivot = new Vector2(0.5f, 1);
-        tRt.sizeDelta = new Vector2(0, 62); tRt.anchoredPosition = Vector2.zero;
+        tRt.sizeDelta = new Vector2(0, 74); tRt.anchoredPosition = Vector2.zero;
 
         // 점수 (왼쪽)
         var scoreGo = Txt(top.transform, "Score: 0", 24, C_TEXT, bold: true);
         hudScoreText = scoreGo.GetComponent<TextMeshProUGUI>();
-        StretchRegion(scoreGo, 0f, 0f, 0.22f, 1f, 20, 0);
+        StretchRegion(scoreGo, 0f, 0f, 0.20f, 1f, 20, 0);
 
-        // 현재 미션 요약 (가운데)
-        var misGo = Txt(top.transform, "미션 대기 중...", 17, C_DIM, center: true);
+        // 현재 미션 요약 (가운데) — 항상 보이도록 크고 밝게 강조
+        var misGo = Txt(top.transform, "미션 대기 중...", 23, C_TEXT, bold: true, center: true);
         hudMissionText = misGo.GetComponent<TextMeshProUGUI>();
         hudMissionText.alignment = TextAlignmentOptions.Midline;
-        StretchRegion(misGo, 0.24f, 0f, 0.74f, 1f);
+        hudMissionText.enableAutoSizing = true;          // 긴 명령도 한 줄에 맞춰 자동 축소
+        hudMissionText.fontSizeMin = 15; hudMissionText.fontSizeMax = 23;
+        StretchRegion(misGo, 0.21f, 0f, 0.79f, 1f);
 
         // 타이머는 TopBar 와 무관하게 캔버스 우측 상단에 독립 배치 (가려짐 방지)
         BuildFloatingTimer(canvasRoot);
@@ -389,7 +391,7 @@ public class UIManager : MonoBehaviour
     {
         if (popupCommandText != null) popupCommandText.text = $"\"{mission.commandText}\"";
         if (popupHintText    != null) popupHintText.text    = "";
-        if (hudMissionText   != null) hudMissionText.text   = $"명령: {mission.commandText}";
+        if (hudMissionText   != null) hudMissionText.text   = $"<color=#FFD24A>미션</color>  \"{mission.commandText}\"";
         missionPopup.SetActive(true);
     }
 
@@ -445,6 +447,19 @@ public class UIManager : MonoBehaviour
         resultBg.color  = success ? C_SUCCESS : C_FAIL;
         resultText.text = success ? $"성공!\n{msg}" : $"실패\n{msg}";
         resultOverlay.SetActive(true);
+        Invoke(nameof(HideResult), 1.6f);
+    }
+
+    /// <summary>
+    /// 재시도 피드백 — 미션 실패가 아니라 "다시 해보세요"라는 비치명적 안내.
+    /// 빨간 '실패' 대신 주황색 톤으로 표시해 부담을 줄인다.
+    /// </summary>
+    public void ShowRetryFeedback(string msg)
+    {
+        resultBg.color  = new Color(0.95f, 0.55f, 0.10f, 0.88f);  // 주황
+        resultText.text = $"다시!\n{msg}";
+        resultOverlay.SetActive(true);
+        CancelInvoke(nameof(HideResult));
         Invoke(nameof(HideResult), 1.6f);
     }
 

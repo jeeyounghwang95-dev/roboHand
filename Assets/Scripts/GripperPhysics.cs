@@ -18,6 +18,11 @@ public class GripperPhysics : MonoBehaviour
     [SerializeField] private float defaultSlipThreshold  = 2.0f;  // 이 미만 → 미끄러짐
     [SerializeField] private float defaultCrushThreshold = 8.0f;  // 이 초과 → 찌그러짐
 
+    [Header("난이도 — 성공 허용 폭")]
+    [Tooltip("값이 클수록 성공으로 인정되는 힘 범위가 넓어집니다 (쉬움). " +
+             "미끄러짐 임계값을 이만큼 낮추고 찌그러짐 임계값을 이만큼 높입니다.")]
+    [SerializeField] private float forgivenessMargin = 1.2f;
+
     [Header("미끄러짐 파라미터")]
     [Tooltip("미끄러질 때 오브젝트에 가할 랜덤 속도 크기")]
     [SerializeField] private float slipImpulseMagnitude = 2f;
@@ -41,6 +46,10 @@ public class GripperPhysics : MonoBehaviour
     {
         float slipThresh  = obj.OverrideSlipThreshold  > 0 ? obj.OverrideSlipThreshold  : defaultSlipThreshold;
         float crushThresh = obj.OverrideCrushThreshold > 0 ? obj.OverrideCrushThreshold : defaultCrushThreshold;
+
+        // 난이도 완화: 성공 허용 범위를 양쪽으로 넓혀 약간의 힘 오차는 성공으로 인정
+        slipThresh  = Mathf.Max(0f, slipThresh - forgivenessMargin);
+        crushThresh = crushThresh + forgivenessMargin;
 
         // TODO: 오브젝트 무게(mass)와 마찰 계수(friction)를 고려한 임계값 보정
         //       예) 무거운 물체는 슬립 임계값이 높아짐

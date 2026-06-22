@@ -49,6 +49,29 @@ public class ObjectSpawner : MonoBehaviour
             if (obj != null) obj.ResetObject(pos);
     }
 
+    /// <summary>
+    /// 특정 오브젝트 하나만 초기 위치로 되돌린다 (집기 재시도용).
+    /// delay > 0 이면 미끄러짐/찌그러짐 효과를 잠깐 보여준 뒤 복구한다.
+    /// </summary>
+    public void ResetSingleObject(ObjectInteractable target, float delay = 0f)
+    {
+        if (target == null) return;
+        if (delay > 0f) StartCoroutine(ResetSingleAfter(target, delay));
+        else            ResetSingleNow(target);
+    }
+
+    private System.Collections.IEnumerator ResetSingleAfter(ObjectInteractable target, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        ResetSingleNow(target);
+    }
+
+    private void ResetSingleNow(ObjectInteractable target)
+    {
+        foreach (var (obj, pos) in spawnedInteractables)
+            if (obj == target) { obj.ResetObject(pos); return; }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     #region 책상
 
@@ -75,43 +98,49 @@ public class ObjectSpawner : MonoBehaviour
     //
     private void SpawnObjects()
     {
+        // ── 겹침 방지 격자 배치 ────────────────────────────────────────────────
+        // 12개 물체를 책상 왼편에 4열 × 3행(가로 0.8m, 세로 0.9m 간격) 격자로 배치.
+        // 이전엔 좌표가 너무 가까워(예: 파란 컵과 망고가 0.22m) 스폰 즉시 서로 밀어내며
+        // 가벼운 컵이 책상에서 튕겨 떨어졌다. 셀마다 하나씩 두어 초기 겹침을 제거한다.
+        //   열 X: -3.0 / -2.2 / -1.4 / -0.6,   행 Z: 1.4(안쪽) / 0.5(중간) / -0.4(앞)
+
         // ── Group A: 과일/채소 (FBX 모델, Assets/Resources/Prefabs/Fruits/) ─────
         // 빨간 계열 ── 사과·석류·망고 (색깔·모양 혼동 유도)
         SpawnFruitPrefab("Apple", tag: "Apple", label: "사과",
-            pos: new Vector3(-2.8f, SURF_Y + 0.10f, 1.2f),
+            pos: new Vector3(-3.0f, SURF_Y + 0.10f, 1.4f),
             slipThresh: 2.5f, crushThresh: 5.5f, crushable: true, slippery: false);
 
         SpawnFruitPrefab("Pomegranate", tag: "Pomegranate", label: "석류",
-            pos: new Vector3(-2.4f, SURF_Y + 0.10f, 0.4f),
+            pos: new Vector3(-3.0f, SURF_Y + 0.10f, 0.5f),
             slipThresh: 2.5f, crushThresh: 6.5f, crushable: true, slippery: false);
 
         SpawnFruitPrefab("Mango", tag: "Mango", label: "망고",
-            pos: new Vector3(-2.6f, SURF_Y + 0.10f, -0.3f),
+            pos: new Vector3(-3.0f, SURF_Y + 0.10f, -0.4f),
             slipThresh: 2.2f, crushThresh: 5.0f, crushable: true, slippery: false);
 
         // 주황 계열 ── 오렌지·한라봉 (꼭지 유무로만 구분)
         SpawnFruitPrefab("Orange", tag: "Orange", label: "오렌지",
-            pos: new Vector3(-1.8f, SURF_Y + 0.10f, 1.0f),
+            pos: new Vector3(-2.2f, SURF_Y + 0.10f, 1.4f),
             slipThresh: 2.2f, crushThresh: 5.0f, crushable: true, slippery: false);
 
         SpawnFruitPrefab("Hallabong", tag: "Hallabong", label: "한라봉",
-            pos: new Vector3(-1.5f, SURF_Y + 0.10f, -0.1f),
+            pos: new Vector3(-2.2f, SURF_Y + 0.10f, 0.5f),
             slipThresh: 2.5f, crushThresh: 4.5f, crushable: true, slippery: false);
 
         // 초록 계열 ── 브로콜리·아티초크 (모양 유사, 단단함 차이)
         SpawnFruitPrefab("Broccoli", tag: "Broccoli", label: "브로콜리",
-            pos: new Vector3(-0.7f, SURF_Y + 0.10f, 0.6f),
+            pos: new Vector3(-1.4f, SURF_Y + 0.10f, 0.5f),
             slipThresh: 2.0f, crushThresh: 6.0f, crushable: true, slippery: false);
 
         SpawnFruitPrefab("Artichoke", tag: "Artichoke", label: "아티초크",
-            pos: new Vector3(-1.0f, SURF_Y + 0.10f, -0.2f),
+            pos: new Vector3(-2.2f, SURF_Y + 0.10f, -0.4f),
             slipThresh: 2.8f, crushThresh: 7.5f, crushable: false, slippery: false);
 
         // ── Group B: 원기둥 컵류 ─────────────────────────────────────────────
         // 파란 컵: 파란 원기둥
         SpawnInteractable(PrimitiveType.Cylinder, "BlueCup",
             tag: "BlueCup", label: "파란 컵",
-            pos: new Vector3(-2.8f, SURF_Y + 0.15f, -0.4f),
+            pos: new Vector3(-1.4f, SURF_Y + 0.15f, -0.4f),
             scale: new Vector3(0.18f, 0.15f, 0.18f),
             col: new Color(0.15f, 0.40f, 0.90f),
             slipThresh: 3.5f, crushThresh: 7.0f, crushable: false, slippery: true);
@@ -119,7 +148,7 @@ public class ObjectSpawner : MonoBehaviour
         // 청록 컵: 파란 컵과 거의 동일한 크기·형태, 색만 약간 다름!
         SpawnInteractable(PrimitiveType.Cylinder, "TealCup",
             tag: "TealCup", label: "청록 컵",
-            pos: new Vector3(-2.0f, SURF_Y + 0.15f, 1.2f),
+            pos: new Vector3(-1.4f, SURF_Y + 0.15f, 1.4f),
             scale: new Vector3(0.18f, 0.15f, 0.18f),
             col: new Color(0.10f, 0.65f, 0.72f),
             slipThresh: 3.5f, crushThresh: 7.0f, crushable: false, slippery: true);
@@ -127,7 +156,7 @@ public class ObjectSpawner : MonoBehaviour
         // 남색 병: 더 얇고 긴 원기둥 (파란 컵과 헷갈림)
         SpawnInteractable(PrimitiveType.Cylinder, "NavyBottle",
             tag: "NavyBottle", label: "남색 병",
-            pos: new Vector3(-1.0f, SURF_Y + 0.22f, 0.5f),
+            pos: new Vector3(-0.6f, SURF_Y + 0.22f, 0.5f),
             scale: new Vector3(0.13f, 0.22f, 0.13f),
             col: new Color(0.08f, 0.15f, 0.55f),
             slipThresh: 4.0f, crushThresh: 8.5f, crushable: false, slippery: true);
@@ -136,7 +165,7 @@ public class ObjectSpawner : MonoBehaviour
         // 노란 블록: 노란 큐브
         SpawnInteractable(PrimitiveType.Cube, "YellowBlock",
             tag: "YellowBlock", label: "노란 블록",
-            pos: new Vector3(-0.4f, SURF_Y + 0.07f, 0.2f),
+            pos: new Vector3(-0.6f, SURF_Y + 0.07f, -0.4f),
             scale: new Vector3(0.22f, 0.14f, 0.18f),
             col: new Color(0.98f, 0.88f, 0.10f),
             slipThresh: 1.5f, crushThresh: 9.0f, crushable: false, slippery: false);
@@ -144,7 +173,7 @@ public class ObjectSpawner : MonoBehaviour
         // 비누: 흰색(약간 노랑기) 큐브 — 블록과 형태 유사, 미끄러움!
         SpawnInteractable(PrimitiveType.Cube, "Soap",
             tag: "Soap", label: "비누",
-            pos: new Vector3(-0.8f, SURF_Y + 0.065f, 1.1f),
+            pos: new Vector3(-0.6f, SURF_Y + 0.065f, 1.4f),
             scale: new Vector3(0.20f, 0.13f, 0.16f),
             col: new Color(0.96f, 0.95f, 0.80f),
             slipThresh: 4.5f, crushThresh: 8.0f, crushable: false, slippery: true);
@@ -224,20 +253,22 @@ public class ObjectSpawner : MonoBehaviour
         // Y는 SURF_Y 기준 (바닥이 책상 위에 올라앉음)
         float bowlY = SURF_Y;
 
+        // 그릇을 안쪽(왼쪽)으로 당겨 물체-그릇 사이 빈 공간을 줄임 → 화면을 더 채워 크게 보이게.
+        // (이전 x: 1.4 / 2.5 → 변경 x: 0.9 / 1.9. 물체 우측 끝 x=-0.6과 1.5m 간격 유지)
         SpawnBowl("RedBowl",    "RedBowl",
-            new Vector3(1.4f, bowlY, 0.0f),
+            new Vector3(0.9f, bowlY, 0.0f),
             new Color(0.85f, 0.10f, 0.10f));   // 선명한 빨강
 
         SpawnBowl("OrangeBowl", "OrangeBowl",
-            new Vector3(2.5f, bowlY, 0.0f),
+            new Vector3(1.9f, bowlY, 0.0f),
             new Color(0.95f, 0.45f, 0.08f));   // 주황 (빨강과 혼동!)
 
         SpawnBowl("BlueBowl",   "BlueBowl",
-            new Vector3(1.4f, bowlY, 1.1f),
+            new Vector3(0.9f, bowlY, 1.1f),
             new Color(0.12f, 0.35f, 0.88f));   // 파랑
 
         SpawnBowl("NavyBowl",   "NavyBowl",
-            new Vector3(2.5f, bowlY, 1.1f),
+            new Vector3(1.9f, bowlY, 1.1f),
             new Color(0.08f, 0.10f, 0.45f));   // 남색 (파랑과 혼동!)
     }
 
@@ -357,7 +388,11 @@ public class ObjectSpawner : MonoBehaviour
         if (cam == null) return;
 
         // 3/4 하향 시점 — 팔·책상·오브젝트가 모두 보임
-        cam.transform.position = new Vector3(0f, 5.5f, -5.5f);
+        // 1.3배(0,4.23,-3.99)로 당겼더니 좌우 끝(왼쪽 물체·오른쪽 그릇)이 잘렸음.
+        // 그릇을 안쪽으로 모아 플레이 영역을 좁힌 뒤, 카메라를 살짝 왼쪽(x=-0.4)으로 옮겨
+        // 좌우로 치우친 구도를 중앙 정렬하고 약 1.2배만 당김 → 전부 화면에 들어오면서 크게 보임.
+        //   더 크게: z를 -3.99 쪽으로(당김) / 더 넓게: z를 -5.5 쪽으로(빼기). x는 좌우 중심.
+        cam.transform.position = new Vector3(-0.4f, 4.6f, -4.4f);
         cam.transform.rotation = Quaternion.Euler(40f, 0f, 0f);
         cam.fieldOfView = 55f;
         cam.backgroundColor = new Color(0.08f, 0.08f, 0.12f);

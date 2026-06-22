@@ -17,7 +17,7 @@ public class GameManager : MonoBehaviour
     // ── Inspector 설정 ───────────────────────────────────────────────────────
     [Header("미션 설정")]
     [SerializeField] private int   totalMissions   = 9;
-    [SerializeField] private float missionTimeLimit = 20f;
+    [SerializeField] private float missionTimeLimit = 30f;  // 인트로 안내문과 일치 + 재시도 여유
 
     [Header("점수 설정")]
     [SerializeField] private int scorePerSuccess = 100;
@@ -131,6 +131,17 @@ public class GameManager : MonoBehaviour
 
         // VLA 인사이트 팝업(4 s) 표시 후 여유를 두고 다음 미션 시작
         Invoke(nameof(StartNewMission), 4.5f);
+    }
+
+    /// <summary>
+    /// 집기 힘 실수(미끄러짐/찌그러짐) — 미션을 실패시키지 않고 재시도하게 한다.
+    /// 상태·점수를 바꾸지 않고 짧은 힌트만 표시하므로 제한 시간 안에서 다시 도전 가능.
+    /// </summary>
+    public void ReportGripRetry(string hint)
+    {
+        if (CurrentState != GameState.MissionActive) return;
+        UIManager.Instance?.ShowRetryFeedback(hint);
+        Debug.Log($"[GameManager] 재시도: {hint}");
     }
 
     /// <summary>미션 실패.</summary>

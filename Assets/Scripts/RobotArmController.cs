@@ -43,6 +43,13 @@ public class RobotArmController : MonoBehaviour
     [SerializeField] private float grabRadius = 0.3f;
     [SerializeField] private LayerMask interactableLayer;
 
+    [Header("위치 가이드 (난이도 완화)")]
+    [Tooltip("그리퍼의 책상 위 XZ 위치를 실선 십자·마커·좌표로 표시")]
+    [SerializeField] private bool  showPositionGuide = true;
+    [SerializeField] private float guideSurfaceY = -0.04f;   // 책상 표면(≈-0.05) 살짝 위
+    [SerializeField] private Color guideColor = new Color(0.20f, 1f, 0.55f, 0.95f);
+    [SerializeField] private float guideLineWidth = 0.03f;
+
     // ── 런타임 상태 ──────────────────────────────────────────────────────────
     private float currentGripForce;
     private bool  isHolding  = false;
@@ -73,6 +80,12 @@ public class RobotArmController : MonoBehaviour
     [Header("UI (선택)")]
     [SerializeField] private UnityEngine.UI.Slider gripForceSlider;
     [SerializeField] private TMPro.TextMeshProUGUI gripForceLabel;
+
+    // ── 위치 가이드 런타임 객체 ──────────────────────────────────────────────
+    private LineRenderer       guideLineX;
+    private LineRenderer       guideLineZ;
+    private Transform          guideMarker;
+    private TMPro.TextMeshPro  guideLabel;
 
     // ─────────────────────────────────────────────────────────────────────────
     #region Unity Lifecycle
@@ -108,10 +121,14 @@ public class RobotArmController : MonoBehaviour
         // RobotArmBuilder.Awake()에서 gripPoint가 생성된 뒤 오프셋 계산
         if (gripPoint != null)
             gripPointLocalOffset = gripPoint.position - transform.position;
+
+        CreatePositionGuide();
     }
 
     private void Update()
     {
+        UpdatePositionGuide();  // 게임 상태와 무관하게 항상 그리퍼 위치 추적
+
         bool gameActive = GameManager.Instance == null
             || GameManager.Instance.CurrentState == GameManager.GameState.MissionActive;
         if (!gameActive) return;
@@ -304,15 +321,19 @@ public class RobotArmController : MonoBehaviour
         }
         else if (result == GripperPhysics.GripResult.TooWeak)
         {
-            Debug.Log("[RobotArmController] 힘이 너무 약해 미끄러짐");
+            // 미션 실패가 아니라 재시도 — 미끄러짐 효과를 잠깐 보여준 뒤 제자리로 복구
+            Debug.Log("[RobotArmController] 힘이 너무 약해 미끄러짐 (재시도 가능)");
             closest.OnSlipped();
-            GameManager.Instance?.ReportFailure("힘이 너무 약해서 미끄러짐");
+            GameManager.Instance?.ReportGripRetry("힘이 약해서 미끄러졌어요 (X로 힘 ↑)");
+            ObjectSpawner.Instance?.ResetSingleObject(closest, 1.0f);
         }
         else if (result == GripperPhysics.GripResult.TooStrong)
         {
-            Debug.Log("[RobotArmController] 힘이 너무 강해 찌그러짐");
+            // 미션 실패가 아니라 재시도 — 찌그러짐 효과를 잠깐 보여준 뒤 제자리로 복구
+            Debug.Log("[RobotArmController] 힘이 너무 강해 찌그러짐 (재시도 가능)");
             closest.OnCrushed();
-            GameManager.Instance?.ReportFailure("힘이 너무 강해서 찌그러짐");
+            GameManager.Instance?.ReportGripRetry("힘이 강해서 찌그러졌어요 (Z로 힘 ↓)");
+            ObjectSpawner.Instance?.ResetSingleObject(closest, 1.0f);
         }
     }
 
@@ -349,6 +370,97 @@ public class RobotArmController : MonoBehaviour
             gripForceLabel.text = $"Grip: {currentGripForce:F1} / {maxGripForce}";
 
         UIManager.Instance?.UpdateGripForce(currentGripForce, maxGripForce);
+    }
+
+    #endregion
+
+    // ─────────────────────────────────────────────────────────────────────────
+    #region 위치 가이드 (난이도 완화)
+    //
+    // 플레이어가 로봇팔(그리퍼)의 책상 위 위치를 대략적으로라도 파악할 수 있도록
+    // 그리퍼의 XZ 위치를 책상 표면에 투영해 표시한다:
+    //   - 십자 실선 2개 (X축·Z축 가이드라인)
+    //   - 교차점 마커 (얇은 원판)
+    //   - 좌표 텍스트 (X, Z 수치)
+
+    private void CreatePositionGuide()
+    {
+        if (!showPositionGuide) return;
+
+        // URP에서 항상 포함되는 셰이더 — 라인/마커 색이 조명 영향 없이 또렷하게 보임
+        Shader unlit = Shader.Find("Sprites/Default");
+
+        guideLineX = MakeGuideLine("PositionGuide_X", unlit);
+        guideLineZ = MakeGuideLine("PositionGuide_Z", unlit);
+
+        // 교차점 마커 — 얇은 원판(Cylinder를 납작하게). 콜라이더 제거로 물리 간섭 방지
+        var markerGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        markerGo.name = "PositionGuide_Marker";
+        var markerCol = markerGo.GetComponent<Collider>();
+        if (markerCol != null) Destroy(markerCol);
+        markerGo.transform.localScale = new Vector3(0.18f, 0.004f, 0.18f);
+        var mr = markerGo.GetComponent<Renderer>();
+        if (mr != null)
+        {
+            mr.material = new Material(unlit) { color = guideColor };
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows    = false;
+        }
+        guideMarker = markerGo.transform;
+
+        // 좌표 텍스트 (월드 공간 3D 텍스트) — 카메라를 향하도록 매 프레임 빌보드
+        var labelGo = new GameObject("PositionGuide_Label");
+        guideLabel = labelGo.AddComponent<TMPro.TextMeshPro>();
+        guideLabel.fontSize  = 3.5f;
+        guideLabel.color     = guideColor;
+        guideLabel.alignment = TMPro.TextAlignmentOptions.Center;
+        guideLabel.rectTransform.sizeDelta = new Vector2(4f, 1f);
+    }
+
+    private LineRenderer MakeGuideLine(string objName, Shader shader)
+    {
+        var go = new GameObject(objName);
+        var lr = go.AddComponent<LineRenderer>();
+        lr.material        = new Material(shader);
+        lr.startColor      = guideColor;
+        lr.endColor        = guideColor;
+        lr.startWidth      = guideLineWidth;
+        lr.endWidth        = guideLineWidth;
+        lr.numCapVertices  = 2;
+        lr.useWorldSpace   = true;
+        lr.positionCount   = 2;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows    = false;
+        return lr;
+    }
+
+    private void UpdatePositionGuide()
+    {
+        if (!showPositionGuide || guideLineX == null) return;
+
+        // XZ는 그리퍼 기준점 위치를 사용 (상하 이동과 무관하게 책상 위 평면 좌표)
+        float gx = gripPoint != null ? gripPoint.position.x : transform.position.x;
+        float gz = gripPoint != null ? gripPoint.position.z : transform.position.z;
+        float y  = guideSurfaceY;
+
+        // X축 가이드라인 (좌우 전체 폭)
+        guideLineX.SetPosition(0, new Vector3(xBounds.x, y, gz));
+        guideLineX.SetPosition(1, new Vector3(xBounds.y, y, gz));
+        // Z축 가이드라인 (앞뒤 전체 깊이)
+        guideLineZ.SetPosition(0, new Vector3(gx, y, zBounds.x));
+        guideLineZ.SetPosition(1, new Vector3(gx, y, zBounds.y));
+
+        if (guideMarker != null)
+            guideMarker.position = new Vector3(gx, y + 0.003f, gz);
+
+        if (guideLabel != null)
+        {
+            guideLabel.text = $"X:{gx:F1}  Z:{gz:F1}";
+            guideLabel.transform.position = new Vector3(gx, y + 0.35f, gz + 0.45f);
+            if (Camera.main != null)
+                guideLabel.transform.rotation = Quaternion.LookRotation(
+                    guideLabel.transform.position - Camera.main.transform.position);
+        }
     }
 
     #endregion
